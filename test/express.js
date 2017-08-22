@@ -34,6 +34,9 @@ describe('Express', function () {
         .set( "overwrite", "old-value", { signed: true } )
         .set( "overwrite", "new-value", { overwrite: true, signed: true } )
 
+        // set a cookie with httpOnly only on signature
+        .set( "signature", "foo", { signed: true, httpOnly: "signature" } )
+
       res.writeHead(302, {Location: "/"})
       res.end()
     })
@@ -43,6 +46,7 @@ describe('Express', function () {
         , signed = req.cookies.get( "signed", { signed: true } )
         , tampered = req.cookies.get( "tampered", { signed: true } )
         , overwrite = req.cookies.get( "overwrite", { signed: true } )
+        , signature = req.cookies.get( "signature", { signed: true, httpOnly: "signature" } )
 
       assert.equal( unsigned, "foo" )
       assert.equal( req.cookies.get( "unsigned.sig", { signed:false } ), undefined)
@@ -52,6 +56,8 @@ describe('Express', function () {
       assert.equal( tampered, undefined )
       assert.equal( overwrite, "new-value" )
       assert.equal( req.cookies.get( "overwrite.sig", { signed:false } ), keys.sign('overwrite=new-value') )
+      assert.equal( signature, "foo" )
+      assert.equal( req.cookies.get( "signature.sig", { signed:false } ), keys.sign('signature=foo') )
 
       assert.equal(res.getHeader('Set-Cookie'), 'tampered.sig=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; httponly')
 
@@ -75,7 +81,7 @@ describe('Express', function () {
       if (err) return done(err)
 
       header = res.headers['set-cookie']
-      assert.equal(header.length, 8)
+      assert.equal(header.length, 10)
       done()
     })
   })

@@ -54,6 +54,7 @@ function setCookies(req, res) {
     .set('tampered.sig', 'bogus')
     .set('overwrite', 'old-value', { signed: true })
     .set('overwrite', 'new-value', { overwrite: true, signed: true })
+    .set('signature', 'foo', { signed: true, httpOnly: 'signature' })
 }
 
 function assertCookies(req, res) {
@@ -61,7 +62,8 @@ function assertCookies(req, res) {
   var unsigned = cookies.get('unsigned'),
     signed = cookies.get('signed', { signed: true }),
     tampered = cookies.get('tampered', { signed: true }),
-    overwrite = cookies.get('overwrite', { signed: true })
+    overwrite = cookies.get('overwrite', { signed: true }),
+    signature = cookies.get('signature', { signed: true, httpOnly: "signature" })
 
   assert.equal(unsigned, 'foo')
   assert.equal(cookies.get('unsigned.sig', { signed:false }), undefined)
@@ -71,11 +73,14 @@ function assertCookies(req, res) {
   assert.equal(tampered, undefined)
   assert.equal(overwrite, 'new-value')
   assert.equal(cookies.get('overwrite.sig', { signed:false }), keys.sign('overwrite=new-value'))
+  assert.equal(signature, 'foo')
+  assert.equal(cookies.get( 'signature.sig', { signed:false } ), keys.sign('signature=foo') )
+
   assert.equal(res.getHeader('Set-Cookie'), 'tampered.sig=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; httponly')
 }
 
 function assertSetCookieHeader(header) {
-  assert.equal(header.length, 7)
+  assert.equal(header.length, 9)
   assert.equal(header[0], 'unsigned=foo; path=/')
   assert.equal(header[1], 'signed=bar; path=/; httponly')
   assert.ok(/^signed\.sig=.{27}; path=\/; httponly$/.test(header[2]))
@@ -83,4 +88,6 @@ function assertSetCookieHeader(header) {
   assert.equal(header[4], 'tampered.sig=bogus; path=/; httponly')
   assert.equal(header[5], 'overwrite=new-value; path=/; httponly')
   assert.ok(/^overwrite\.sig=.{27}; path=\/; httponly$/.test(header[6]))
+  assert.equal(header[7], 'signature=foo; path=/')
+  assert.ok(/^signature\.sig=.{27}; path=\/; httponly$/.test(header[8]))
 }

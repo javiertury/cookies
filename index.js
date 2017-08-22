@@ -102,10 +102,12 @@ Cookies.prototype.set = function(name, value, opts) {
     cookie.secure = opts.secureProxy
   }
 
+  if (opts && "httpOnly" in opts && opts.httpOnly == 'signature') cookie.httpOnly = false
   headers = pushCookie(headers, cookie)
 
   if (opts && signed) {
     if (!this.keys) throw new Error('.keys required for signed cookies');
+    if ("httpOnly" in opts && opts.httpOnly == 'signature') cookie.httpOnly = true
     cookie.value = this.keys.sign(cookie.toString())
     cookie.name += ".sig"
     headers = pushCookie(headers, cookie)

@@ -12,7 +12,7 @@ describe('HTTP', function () {
   before(function setup() {
     server = http.createServer( function( req, res ) {
       var cookies = new Cookies( req, res, keys )
-        , unsigned, signed, tampered, overwrite
+        , unsigned, signed, tampered, overwrite, signature
 
       assert.equal( cookies.constructor, Cookies )
 
@@ -32,6 +32,9 @@ describe('HTTP', function () {
           .set( "overwrite", "old-value", { signed: true } )
           .set( "overwrite", "new-value", { overwrite: true, signed: true } )
 
+          // set a cookie with httpOnly only on signature
+          .set('signature', 'foo', { signed: true, httpOnly: 'signature' })
+
           // set a secure cookie
           .set( "sec", "yes", { secureProxy: true } )
 
@@ -43,6 +46,7 @@ describe('HTTP', function () {
       signed = cookies.get( "signed", { signed: true } )
       tampered = cookies.get( "tampered", { signed: true } )
       overwrite = cookies.get( "overwrite", { signed: true } )
+      signature = cookies.get( "signature", { signed: true } )
 
       assert.equal( unsigned, "foo" )
       assert.equal( cookies.get( "unsigned.sig", { signed:false } ), undefined)
@@ -52,6 +56,8 @@ describe('HTTP', function () {
       assert.equal( tampered, undefined )
       assert.equal( overwrite, "new-value" )
       assert.equal( cookies.get( "overwrite.sig", { signed:false } ), keys.sign('overwrite=new-value') )
+      assert.equal( signature, "foo")
+      assert.equal( cookies.get( "signature.sig", { signed:false } ), keys.sign('signature=foo') )
 
       assert.equal(res.getHeader('Set-Cookie'), 'tampered.sig=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; httponly')
 
@@ -74,7 +80,7 @@ describe('HTTP', function () {
       if (err) return done(err)
 
       header = res.headers['set-cookie']
-      assert.equal(header.length, 9)
+      assert.equal(header.length, 11)
       done()
     })
   })
