@@ -72,10 +72,11 @@ Cookies.prototype.get = function(name, opts) {
   if (!this.keys) throw new Error('.keys required for signed cookies');
   index = this.keys.index(data, remote)
 
+  var sigOpts = getSigOpts(opts)
   if (index < 0) {
-    this.set(sigName, null, {path: "/", signed: false })
+    this.set(sigName, null, sigOpts)
   } else {
-    index && this.set(sigName, this.keys.sign(data), { signed: false })
+    index && this.set(sigName, this.keys.sign(data), sigOpts)
     return value
   }
 };
@@ -85,30 +86,25 @@ Cookies.prototype.set = function(name, value, opts) {
     , req = this.request
     , headers = res.getHeader("Set-Cookie") || []
     , secure = this.secure !== undefined ? !!this.secure : req.protocol === 'https' || req.connection.encrypted
-    , cookie = new Cookie(name, value, opts)
     , signed = opts && opts.signed !== undefined ? opts.signed : !!this.keys
+    , sigOpts = opts && signed && getSigOpts(opts)
 
   if (typeof headers == "string") headers = [headers]
 
-  if (!secure && opts && opts.secure) {
-    throw new Error('Cannot send secure cookie over unencrypted connection')
-  }
+  validateOpts(opts, secure)
+  validateOpts(sigOpts, secure)
 
-  cookie.secure = secure
-  if (opts && "secure" in opts) cookie.secure = opts.secure
-
-  if (opts && "secureProxy" in opts) {
-    deprecate('"secureProxy" option; use "secure" option, provide "secure" to constructor if needed')
-    cookie.secure = opts.secureProxy
-  }
-
+  var cookie = new Cookie(name, value, opts)
+  cookie.secure = (opts && "secure" in opts) ? opts.secure : secure
   headers = pushCookie(headers, cookie)
 
   if (opts && signed) {
     if (!this.keys) throw new Error('.keys required for signed cookies');
-    cookie.value = this.keys.sign(cookie.toString())
-    cookie.name += ".sig"
-    headers = pushCookie(headers, cookie)
+    var sig = new Cookie(cookie.name + '.sig',
+      this.keys.sign(cookie.toString()),
+      sigOpts)
+    sig.secure = (sigOpts && 'secure' in sigOpts) ? sigOpts.secure : secure
+    headers = pushCookie(headers, sig)
   }
 
   var setHeader = res.set ? http.OutgoingMessage.prototype.setHeader : res.setHeader
@@ -199,6 +195,26 @@ function pushCookie(cookies, cookie) {
   }
   cookies.push(cookie.toHeader())
   return cookies
+}
+
+function validateOpts(optsObj, secure) {
+  if (!optsObj) return
+
+  if (!secure && optsObj.secure) {
+    throw new Error('Cannot send secure cookie over unencrypted connection')
+  }
+
+  if ("secureProxy" in optsObj) {
+    deprecate('"secureProxy" option; use "secure" option, provide "secure" to constructor if needed')
+    optsObj.secure = optsObj.secureProxy
+  }
+}
+
+function getSigOpts(opts) {
+  return Object.assign({}, opts, opts.signature, {
+      signed: false,
+      signature: undefined,
+  })
 }
 
 Cookies.connect = Cookies.express = function(keys) {
